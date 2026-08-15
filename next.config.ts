@@ -1,7 +1,8 @@
+import { withSerwist } from "@serwist/turbopack";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // aquí puede ir cualquier configuración tuya de Next.js si la agregas después
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);
