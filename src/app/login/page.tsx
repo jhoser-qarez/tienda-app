@@ -22,7 +22,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/");
+    router.push("/ventas");
     router.refresh();
   };
 

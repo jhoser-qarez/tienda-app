@@ -20,12 +20,11 @@ export default function NavBar() {
   return (
     <nav className="flex items-center justify-between border-b p-4">
       <div className="flex gap-4">
-        <Link href="/" className="font-semibold">
-          Inicio
-        </Link>
+        <Link href="/ventas"className="font-semibold">Ventas</Link>
         <Link href="/productos">Productos</Link>
-        <Link href="/ventas">Ventas</Link>
+        <Link href="/historial" >Historial</Link>
         <Link href="/clientes">Clientes</Link>
+        
       </div>
       <button onClick={handleLogout} className="text-sm text-red-600">
         Cerrar sesión

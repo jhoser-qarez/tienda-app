@@ -11,7 +11,10 @@ type Producto = {
   stock: number;
   activo: boolean;
   unidad: "unidad" | "kg";
+  favorito: boolean;
 };
+
+const MAX_FAVORITOS = 6;
 
 export default function ProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -104,6 +107,31 @@ export default function ProductosPage() {
     cargarProductos();
   };
 
+  const handleToggleFavorito = async (producto: Producto) => {
+    setError("");
+
+    if (!producto.favorito) {
+      const cantidadActual = productos.filter((p) => p.favorito).length;
+      if (cantidadActual >= MAX_FAVORITOS) {
+        setError(
+          `Ya tienes ${MAX_FAVORITOS} favoritos. Desmarca uno antes de agregar otro.`
+        );
+        return;
+      }
+    }
+
+    const { error } = await supabase
+      .from("productos")
+      .update({ favorito: !producto.favorito })
+      .eq("id", producto.id);
+
+    if (error) {
+      setError("Error al actualizar favorito: " + error.message);
+      return;
+    }
+    cargarProductos();
+  };
+
   const handleEliminar = async (id: string) => {
     if (!confirm("¿Seguro que quieres eliminar este producto?")) return;
 
@@ -120,9 +148,14 @@ export default function ProductosPage() {
     cargarProductos();
   };
 
+  const cantidadFavoritos = productos.filter((p) => p.favorito).length;
+
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-4">Inventario</h1>
+      <h1 className="text-2xl font-bold mb-1">Inventario</h1>
+      <p className="text-sm text-gray-500 mb-4">
+        Favoritos: {cantidadFavoritos}/{MAX_FAVORITOS}
+      </p>
 
       <form onSubmit={handleAgregar} className="space-y-2 border rounded p-4 mb-6">
         <h2 className="font-semibold">Agregar producto</h2>
@@ -206,12 +239,27 @@ export default function ProductosPage() {
               key={p.id}
               className="flex items-center justify-between border rounded p-3"
             >
-              <div>
-                <p className="font-medium">{p.nombre}</p>
-                <p className="text-sm text-gray-500">
-                  {p.categoria || "Sin categoría"} · S/ {p.precio.toFixed(2)}
-                  {p.unidad === "kg" ? " /kg" : ""}
-                </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleToggleFavorito(p)}
+                  className="text-xl leading-none"
+                  aria-label={
+                    p.favorito ? "Quitar de favoritos" : "Marcar como favorito"
+                  }
+                >
+                  {p.favorito ? (
+                    <span className="text-yellow-500">★</span>
+                  ) : (
+                    <span className="text-gray-300">☆</span>
+                  )}
+                </button>
+                <div>
+                  <p className="font-medium">{p.nombre}</p>
+                  <p className="text-sm text-gray-500">
+                    {p.categoria || "Sin categoría"} · S/ {p.precio.toFixed(2)}
+                    {p.unidad === "kg" ? " /kg" : ""}
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {p.unidad === "unidad" ? (

@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+type DetalleItem = {
+  cantidad: number;
+  productos: { nombre: string; unidad: "unidad" | "kg" } | null;
+};
+
 type Abono = { monto: number };
 
 type Venta = {
@@ -11,6 +16,7 @@ type Venta = {
   estado_pago: string;
   created_at: string;
   abonos: Abono[];
+  detalle_ventas: DetalleItem[];
 };
 
 type Cliente = {
@@ -35,7 +41,12 @@ export default function ClientesPage() {
     const { data, error } = await supabase
       .from("clientes")
       .select(
-        "id, nombre, telefono, ventas(id, total, estado_pago, created_at, abonos(monto))"
+        `id, nombre, telefono,
+         ventas(
+           id, total, estado_pago, created_at,
+           abonos(monto),
+           detalle_ventas(cantidad, productos(nombre, unidad))
+         )`
       )
       .eq("ventas.metodo_pago", "fiado")
       .order("nombre");
@@ -60,6 +71,19 @@ export default function ClientesPage() {
 
   const saldoCliente = (cliente: Cliente) =>
     cliente.ventas.reduce((sum, v) => sum + saldoVenta(v), 0);
+
+  const formatearDetalle = (detalle: DetalleItem[]) => {
+    return detalle
+      .filter((d) => d.productos)
+      .map((d) => {
+        const nombre = d.productos!.nombre;
+        if (d.productos!.unidad === "kg") {
+          return `${d.cantidad.toFixed(3)}kg ${nombre}`;
+        }
+        return `${d.cantidad}x ${nombre}`;
+      })
+      .join(" · ");
+  };
 
   const handleAbonar = async (ventaId: string) => {
     setError("");
@@ -128,7 +152,7 @@ export default function ClientesPage() {
                     .filter((v) => saldoVenta(v) > 0)
                     .map((v) => (
                       <div key={v.id} className="bg-gray-50 rounded p-3">
-                        <div className="flex justify-between text-sm mb-2">
+                        <div className="flex justify-between text-sm mb-1">
                           <span>
                             {new Date(v.created_at).toLocaleDateString("es-PE")}
                           </span>
@@ -137,6 +161,11 @@ export default function ClientesPage() {
                             {saldoVenta(v).toFixed(2)}
                           </span>
                         </div>
+                        {v.detalle_ventas.length > 0 && (
+                          <p className="text-xs text-gray-500 mb-2">
+                            {formatearDetalle(v.detalle_ventas)}
+                          </p>
+                        )}
                         <div className="flex gap-2">
                           <input
                             type="number"

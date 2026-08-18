@@ -12,6 +12,7 @@ type Producto = {
   precio: number;
   stock: number;
   unidad: "unidad" | "kg";
+  favorito: boolean;
 };
 
 type Cliente = {
@@ -25,6 +26,7 @@ type ItemCarrito = {
 };
 
 const METODOS = ["efectivo", "yape", "plin", "fiado"] as const;
+const MONTOS_RAPIDOS = [10, 20, 50, 100];
 
 function extraerMensaje(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -52,6 +54,7 @@ export default function VentasPage() {
   const [clienteId, setClienteId] = useState<string>("");
   const [nuevoCliente, setNuevoCliente] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [montoRecibido, setMontoRecibido] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -66,7 +69,7 @@ export default function VentasPage() {
       const [prodRes, cliRes] = await Promise.all([
         supabase
           .from("productos")
-          .select("id, nombre, precio, stock, unidad")
+          .select("id, nombre, precio, stock, unidad, favorito")
           .eq("activo", true)
           .gt("stock", 0)
           .order("nombre"),
@@ -161,6 +164,11 @@ export default function VentasPage() {
     0
   );
 
+  const vuelto =
+    metodoPago === "efectivo" && montoRecibido
+      ? parseFloat(montoRecibido) - total
+      : null;
+
   const registrarVenta = async () => {
     setError("");
     setMensaje("");
@@ -248,6 +256,7 @@ export default function VentasPage() {
       setClienteId("");
       setNuevoCliente("");
       setMetodoPago("efectivo");
+      setMontoRecibido("");
       cargarDatos();
     } catch (err) {
       if (esErrorDeRed(err)) {
@@ -274,6 +283,7 @@ export default function VentasPage() {
           setClienteId("");
           setNuevoCliente("");
           setMetodoPago("efectivo");
+          setMontoRecibido("");
           actualizarPendientes();
         } catch (dbErr) {
           setError(
@@ -289,12 +299,17 @@ export default function VentasPage() {
     }
   };
 
-  const productosFiltrados = productos.filter((p) =>
-    p.nombre.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  const favoritos = productos.filter((p) => p.favorito);
+  const resultadosBusqueda = busqueda.trim()
+    ? productos.filter((p) =>
+        p.nombre.toLowerCase().includes(busqueda.toLowerCase())
+      )
+    : [];
+
+  const listaAMostrar = busqueda.trim() ? resultadosBusqueda : favoritos;
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl pb-24">
       <h1 className="text-2xl font-bold mb-4">Nueva venta</h1>
 
       {!online && (
@@ -317,28 +332,42 @@ export default function VentasPage() {
         className="w-full rounded border p-2 mb-2"
       />
 
-      <div className="grid grid-cols-2 gap-2 mb-6">
-        {productosFiltrados.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => agregarAlCarrito(p)}
-            className="rounded border p-3 text-left hover:bg-gray-50"
-          >
-            <p className="font-medium">{p.nombre}</p>
-            <p className="text-sm text-gray-500">
-              S/ {p.precio.toFixed(2)}
-              {p.unidad === "kg" ? " /kg" : ""} · Stock:{" "}
-              {p.unidad === "kg" ? p.stock.toFixed(3) : p.stock}
-              {p.unidad === "kg" ? " kg" : ""}
-            </p>
-          </button>
-        ))}
-      </div>
+      {!busqueda.trim() && (
+        <p className="text-sm text-gray-500 mb-2">Favoritos</p>
+      )}
+
+      {listaAMostrar.length === 0 ? (
+        <p className="text-sm text-gray-500 mb-6">
+          {busqueda.trim()
+            ? "No se encontró ningún producto con ese nombre."
+            : "Aún no tienes productos favoritos. Márcalos con la estrella en Inventario."}
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 mb-6">
+          {listaAMostrar.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => agregarAlCarrito(p)}
+              className="rounded border p-3 text-left hover:bg-gray-50"
+            >
+              <p className="font-medium">{p.nombre}</p>
+              <p className="text-sm text-gray-500">
+                S/ {p.precio.toFixed(2)}
+                {p.unidad === "kg" ? " /kg" : ""} · Stock:{" "}
+                {p.unidad === "kg" ? p.stock.toFixed(3) : p.stock}
+                {p.unidad === "kg" ? " kg" : ""}
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="border rounded p-4 mb-4">
         <h2 className="font-semibold mb-2">Carrito</h2>
         {carrito.length === 0 ? (
-          <p className="text-gray-500 text-sm">Toca un producto para agregarlo</p>
+          <p className="text-gray-500 text-sm">
+            Busca o toca un favorito para agregarlo
+          </p>
         ) : (
           <div className="space-y-2">
             {carrito.map((i) => (
@@ -417,6 +446,47 @@ export default function VentasPage() {
         </div>
       </div>
 
+      {metodoPago === "efectivo" && (
+        <div className="mb-4 border rounded p-4">
+          <p className="text-sm text-gray-600 mb-2">¿Con cuánto paga?</p>
+          <div className="flex gap-2 mb-2">
+            {MONTOS_RAPIDOS.map((m) => (
+              <button
+                key={m}
+                onClick={() => setMontoRecibido(String(m))}
+                className={`flex-1 rounded border py-2 text-sm ${
+                  montoRecibido === String(m) ? "bg-black text-white" : ""
+                }`}
+              >
+                S/{m}
+              </button>
+            ))}
+          </div>
+          <input
+            type="number"
+            step="0.10"
+            min="0"
+            placeholder="Otro monto"
+            value={montoRecibido}
+            onChange={(e) => setMontoRecibido(e.target.value)}
+            className="w-full rounded border p-2 mb-2"
+          />
+          {vuelto !== null && (
+            <div className="flex justify-between text-sm pt-2 border-t">
+              <span className="text-gray-600">Vuelto</span>
+              <span
+                className={`font-semibold ${
+                  vuelto < 0 ? "text-red-600" : "text-green-600"
+                }`}
+              >
+                S/ {vuelto.toFixed(2)}
+                {vuelto < 0 ? " (falta)" : ""}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {metodoPago === "fiado" && (
         <div className="mb-4 space-y-2">
           <h2 className="font-semibold">¿A quién se le fía?</h2>
@@ -447,13 +517,21 @@ export default function VentasPage() {
       {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
       {mensaje && <p className="text-sm text-green-600 mb-2">{mensaje}</p>}
 
-      <button
-        onClick={registrarVenta}
-        disabled={guardando}
-        className="w-full rounded bg-black p-3 text-white font-semibold disabled:opacity-50"
-      >
-        {guardando ? "Guardando..." : `Cobrar S/ ${total.toFixed(2)}`}
-      </button>
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3">
+        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-gray-500">{carrito.length} producto(s)</p>
+            <p className="text-lg font-semibold">S/ {total.toFixed(2)}</p>
+          </div>
+          <button
+            onClick={registrarVenta}
+            disabled={guardando}
+            className="rounded bg-black px-6 py-3 text-white font-semibold disabled:opacity-50"
+          >
+            {guardando ? "Guardando..." : "Cobrar"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
