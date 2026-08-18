@@ -309,17 +309,17 @@ export default function VentasPage() {
   const listaAMostrar = busqueda.trim() ? resultadosBusqueda : favoritos;
 
   return (
-    <div className="max-w-2xl pb-24">
-      <h1 className="text-2xl font-bold mb-4">Nueva venta</h1>
+    <div className="max-w-2xl pb-28">
+      <h1 className="text-3xl font-bold mb-5">Nueva venta</h1>
 
       {!online && (
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 rounded p-2 mb-4 text-sm">
-          📴 Sin conexión — las ventas se guardan en este dispositivo y se
-          sincronizarán automáticamente cuando vuelva el internet.
+        <div className="bg-amber-50 border-2 border-amber-400 text-amber-900 rounded-xl p-3 mb-4 text-base font-medium">
+          📴 Sin conexión — la venta se guarda en este dispositivo y se
+          sincroniza sola cuando vuelva el internet.
         </div>
       )}
       {pendientesCount > 0 && (
-        <div className="bg-blue-100 border border-blue-400 text-blue-800 rounded p-2 mb-4 text-sm">
+        <div className="bg-primary/10 border-2 border-primary text-primary rounded-xl p-3 mb-4 text-base font-medium">
           🔄 {pendientesCount} venta(s) pendiente(s) de sincronizar.
         </div>
       )}
@@ -329,32 +329,34 @@ export default function VentasPage() {
         placeholder="Buscar producto..."
         value={busqueda}
         onChange={(e) => setBusqueda(e.target.value)}
-        className="w-full rounded border p-2 mb-2"
+        className="w-full rounded-xl border-2 border-gray-300 p-4 text-lg mb-3"
       />
 
       {!busqueda.trim() && (
-        <p className="text-sm text-gray-500 mb-2">Favoritos</p>
+        <p className="text-lg font-semibold text-gray-700 mb-2">Favoritos</p>
       )}
 
       {listaAMostrar.length === 0 ? (
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-base text-gray-500 mb-6">
           {busqueda.trim()
             ? "No se encontró ningún producto con ese nombre."
             : "Aún no tienes productos favoritos. Márcalos con la estrella en Inventario."}
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-2 mb-6">
+        <div className="grid grid-cols-2 gap-3 mb-6">
           {listaAMostrar.map((p) => (
             <button
               key={p.id}
               onClick={() => agregarAlCarrito(p)}
-              className="rounded border p-3 text-left hover:bg-gray-50"
+              className="rounded-xl border-2 border-gray-300 bg-white p-4 text-left active:bg-gray-100"
             >
-              <p className="font-medium">{p.nombre}</p>
-              <p className="text-sm text-gray-500">
+              <p className="text-lg font-bold text-gray-900">{p.nombre}</p>
+              <p className="text-base text-primary font-semibold mt-1">
                 S/ {p.precio.toFixed(2)}
-                {p.unidad === "kg" ? " /kg" : ""} · Stock:{" "}
-                {p.unidad === "kg" ? p.stock.toFixed(3) : p.stock}
+                {p.unidad === "kg" ? " /kg" : ""}
+              </p>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Stock: {p.unidad === "kg" ? p.stock.toFixed(3) : p.stock}
                 {p.unidad === "kg" ? " kg" : ""}
               </p>
             </button>
@@ -362,33 +364,37 @@ export default function VentasPage() {
         </div>
       )}
 
-      <div className="border rounded p-4 mb-4">
-        <h2 className="font-semibold mb-2">Carrito</h2>
+      <div className="border-2 border-gray-300 rounded-xl p-4 mb-4">
+        <h2 className="text-lg font-bold mb-3">Carrito</h2>
         {carrito.length === 0 ? (
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-500 text-base">
             Busca o toca un favorito para agregarlo
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {carrito.map((i) => (
               <div
                 key={i.producto.id}
-                className="flex items-center justify-between"
+                className="flex items-center justify-between gap-2"
               >
-                <span>{i.producto.nombre}</span>
-                <div className="flex items-center gap-2">
+                <span className="text-base font-medium flex-1 min-w-0 truncate">
+                  {i.producto.nombre}
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
                   {i.producto.unidad === "unidad" ? (
                     <>
                       <button
                         onClick={() => cambiarCantidadUnidad(i.producto.id, -1)}
-                        className="rounded border w-8 h-8"
+                        className="rounded-lg border-2 border-gray-300 w-11 h-11 text-xl font-bold"
                       >
                         −
                       </button>
-                      <span className="w-8 text-center">{i.cantidad}</span>
+                      <span className="w-8 text-center text-lg font-semibold">
+                        {i.cantidad}
+                      </span>
                       <button
                         onClick={() => cambiarCantidadUnidad(i.producto.id, 1)}
-                        className="rounded border w-8 h-8"
+                        className="rounded-lg border-2 border-gray-300 w-11 h-11 text-xl font-bold"
                       >
                         +
                       </button>
@@ -404,24 +410,24 @@ export default function VentasPage() {
                         onChange={(e) =>
                           cambiarCantidadKg(i.producto.id, e.target.value)
                         }
-                        className="w-20 rounded border p-1 text-right"
+                        className="w-24 rounded-lg border-2 border-gray-300 p-2 text-right text-base"
                       />
-                      <span className="text-sm text-gray-500">kg</span>
+                      <span className="text-base text-gray-600">kg</span>
                       <button
                         onClick={() => quitarDelCarrito(i.producto.id)}
-                        className="text-red-600 text-sm"
+                        className="text-danger text-base font-semibold"
                       >
                         Quitar
                       </button>
                     </>
                   )}
-                  <span className="w-20 text-right">
+                  <span className="w-20 text-right text-base font-semibold">
                     S/ {(i.producto.precio * i.cantidad).toFixed(2)}
                   </span>
                 </div>
               </div>
             ))}
-            <div className="border-t pt-2 flex justify-between font-bold">
+            <div className="border-t-2 pt-3 flex justify-between text-xl font-bold">
               <span>Total</span>
               <span>S/ {total.toFixed(2)}</span>
             </div>
@@ -430,14 +436,16 @@ export default function VentasPage() {
       </div>
 
       <div className="mb-4">
-        <h2 className="font-semibold mb-2">Método de pago</h2>
-        <div className="flex gap-2">
+        <h2 className="text-lg font-bold mb-3">Método de pago</h2>
+        <div className="grid grid-cols-2 gap-2">
           {METODOS.map((m) => (
             <button
               key={m}
               onClick={() => setMetodoPago(m)}
-              className={`rounded border px-4 py-2 capitalize ${
-                metodoPago === m ? "bg-black text-white" : ""
+              className={`rounded-xl border-2 py-4 text-lg font-semibold capitalize ${
+                metodoPago === m
+                  ? "bg-primary border-primary text-white"
+                  : "border-gray-300 text-gray-700"
               }`}
             >
               {m}
@@ -447,15 +455,19 @@ export default function VentasPage() {
       </div>
 
       {metodoPago === "efectivo" && (
-        <div className="mb-4 border rounded p-4">
-          <p className="text-sm text-gray-600 mb-2">¿Con cuánto paga?</p>
-          <div className="flex gap-2 mb-2">
+        <div className="mb-4 border-2 border-gray-300 rounded-xl p-4">
+          <p className="text-base font-medium text-gray-700 mb-3">
+            ¿Con cuánto paga?
+          </p>
+          <div className="grid grid-cols-4 gap-2 mb-3">
             {MONTOS_RAPIDOS.map((m) => (
               <button
                 key={m}
                 onClick={() => setMontoRecibido(String(m))}
-                className={`flex-1 rounded border py-2 text-sm ${
-                  montoRecibido === String(m) ? "bg-black text-white" : ""
+                className={`rounded-lg border-2 py-3 text-base font-semibold ${
+                  montoRecibido === String(m)
+                    ? "bg-primary border-primary text-white"
+                    : "border-gray-300"
                 }`}
               >
                 S/{m}
@@ -469,14 +481,14 @@ export default function VentasPage() {
             placeholder="Otro monto"
             value={montoRecibido}
             onChange={(e) => setMontoRecibido(e.target.value)}
-            className="w-full rounded border p-2 mb-2"
+            className="w-full rounded-lg border-2 border-gray-300 p-3 text-lg mb-3"
           />
           {vuelto !== null && (
-            <div className="flex justify-between text-sm pt-2 border-t">
-              <span className="text-gray-600">Vuelto</span>
+            <div className="flex justify-between text-lg pt-3 border-t-2">
+              <span className="text-gray-700 font-medium">Vuelto</span>
               <span
-                className={`font-semibold ${
-                  vuelto < 0 ? "text-red-600" : "text-green-600"
+                className={`font-bold ${
+                  vuelto < 0 ? "text-danger" : "text-success"
                 }`}
               >
                 S/ {vuelto.toFixed(2)}
@@ -488,12 +500,12 @@ export default function VentasPage() {
       )}
 
       {metodoPago === "fiado" && (
-        <div className="mb-4 space-y-2">
-          <h2 className="font-semibold">¿A quién se le fía?</h2>
+        <div className="mb-4 space-y-3">
+          <h2 className="text-lg font-bold">¿A quién se le fía?</h2>
           <select
             value={clienteId}
             onChange={(e) => setClienteId(e.target.value)}
-            className="w-full rounded border p-2"
+            className="w-full rounded-xl border-2 border-gray-300 p-4 text-lg"
           >
             <option value="">— Selecciona un cliente —</option>
             {clientes.map((c) => (
@@ -508,25 +520,29 @@ export default function VentasPage() {
               placeholder="...o escribe el nombre de un cliente nuevo"
               value={nuevoCliente}
               onChange={(e) => setNuevoCliente(e.target.value)}
-              className="w-full rounded border p-2"
+              className="w-full rounded-xl border-2 border-gray-300 p-4 text-lg"
             />
           )}
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
-      {mensaje && <p className="text-sm text-green-600 mb-2">{mensaje}</p>}
+      {error && (
+        <p className="text-base font-medium text-danger mb-3">{error}</p>
+      )}
+      {mensaje && (
+        <p className="text-base font-medium text-success mb-3">{mensaje}</p>
+      )}
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-300 p-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs text-gray-500">{carrito.length} producto(s)</p>
-            <p className="text-lg font-semibold">S/ {total.toFixed(2)}</p>
+            <p className="text-sm text-gray-600">{carrito.length} producto(s)</p>
+            <p className="text-2xl font-bold">S/ {total.toFixed(2)}</p>
           </div>
           <button
             onClick={registrarVenta}
             disabled={guardando}
-            className="rounded bg-black px-6 py-3 text-white font-semibold disabled:opacity-50"
+            className="rounded-xl bg-accent px-8 py-4 text-white text-xl font-bold disabled:opacity-50"
           >
             {guardando ? "Guardando..." : "Cobrar"}
           </button>
