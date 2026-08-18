@@ -14,7 +14,15 @@ type Producto = {
   favorito: boolean;
 };
 
+type FormEdicion = {
+  nombre: string;
+  categoria: string;
+  precio: string;
+  stock: string;
+};
+
 const MAX_FAVORITOS = 6;
+const SIN_CATEGORIA = "Sin categoría";
 
 export default function ProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -26,6 +34,14 @@ export default function ProductosPage() {
   const [precio, setPrecio] = useState("");
   const [stock, setStock] = useState("");
   const [unidad, setUnidad] = useState<"unidad" | "kg">("unidad");
+
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [formEdicion, setFormEdicion] = useState<FormEdicion>({
+    nombre: "",
+    categoria: "",
+    precio: "",
+    stock: "",
+  });
 
   const supabase = createClient();
 
@@ -75,38 +91,6 @@ export default function ProductosPage() {
     cargarProductos();
   };
 
-  const handleEditarStockUnidad = async (id: string, nuevoStock: number) => {
-    if (nuevoStock < 0) return;
-
-    const { error } = await supabase
-      .from("productos")
-      .update({ stock: nuevoStock })
-      .eq("id", id);
-
-    if (error) {
-      setError("Error al actualizar stock: " + error.message);
-      return;
-    }
-    setLoading(true);
-    cargarProductos();
-  };
-
-  const handleEditarStockKg = async (id: string, valorTexto: string) => {
-    const nuevoStock = parseFloat(valorTexto);
-    if (isNaN(nuevoStock) || nuevoStock < 0) return;
-
-    const { error } = await supabase
-      .from("productos")
-      .update({ stock: nuevoStock })
-      .eq("id", id);
-
-    if (error) {
-      setError("Error al actualizar stock: " + error.message);
-      return;
-    }
-    cargarProductos();
-  };
-
   const handleToggleFavorito = async (producto: Producto) => {
     setError("");
 
@@ -148,7 +132,75 @@ export default function ProductosPage() {
     cargarProductos();
   };
 
+  const iniciarEdicion = (p: Producto) => {
+    setError("");
+    setEditandoId(p.id);
+    setFormEdicion({
+      nombre: p.nombre,
+      categoria: p.categoria || "",
+      precio: String(p.precio),
+      stock: String(p.stock),
+    });
+  };
+
+  const cancelarEdicion = () => {
+    setEditandoId(null);
+  };
+
+  const guardarEdicion = async (id: string, unidadProducto: "unidad" | "kg") => {
+    setError("");
+
+    const nuevoNombre = formEdicion.nombre.trim();
+    const nuevoPrecio = parseFloat(formEdicion.precio);
+    const nuevoStock = parseFloat(formEdicion.stock);
+
+    if (!nuevoNombre) {
+      setError("El nombre no puede quedar vacío");
+      return;
+    }
+    if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
+      setError("El precio no es válido");
+      return;
+    }
+    if (isNaN(nuevoStock) || nuevoStock < 0) {
+      setError("El stock no es válido");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("productos")
+      .update({
+        nombre: nuevoNombre,
+        categoria: formEdicion.categoria.trim() || null,
+        precio: nuevoPrecio,
+        stock: nuevoStock,
+      })
+      .eq("id", id);
+
+    if (error) {
+      setError("Error al guardar los cambios: " + error.message);
+      return;
+    }
+
+    setEditandoId(null);
+    setLoading(true);
+    cargarProductos();
+    void unidadProducto;
+  };
+
   const cantidadFavoritos = productos.filter((p) => p.favorito).length;
+
+  const grupos = new Map<string, Producto[]>();
+  for (const p of productos) {
+    const clave = p.categoria?.trim() || SIN_CATEGORIA;
+    if (!grupos.has(clave)) grupos.set(clave, []);
+    grupos.get(clave)!.push(p);
+  }
+  const categoriasOrdenadas = Array.from(grupos.keys()).sort((a, b) => {
+    if (a === SIN_CATEGORIA) return 1;
+    if (b === SIN_CATEGORIA) return -1;
+    return a.localeCompare(b);
+  });
 
   return (
     <div className="max-w-2xl">
@@ -233,70 +285,154 @@ export default function ProductosPage() {
       ) : productos.length === 0 ? (
         <p className="text-gray-500">Aún no tienes productos registrados.</p>
       ) : (
-        <div className="space-y-2">
-          {productos.map((p) => (
-            <div
-              key={p.id}
-              className="flex items-center justify-between border rounded p-3"
-            >
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleToggleFavorito(p)}
-                  className="text-xl leading-none"
-                  aria-label={
-                    p.favorito ? "Quitar de favoritos" : "Marcar como favorito"
-                  }
-                >
-                  {p.favorito ? (
-                    <span className="text-yellow-500">★</span>
-                  ) : (
-                    <span className="text-gray-300">☆</span>
+        <div className="space-y-6">
+          {categoriasOrdenadas.map((cat) => (
+            <div key={cat}>
+              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
+                {cat}
+              </h3>
+              <div className="space-y-2">
+                {grupos
+                  .get(cat)!
+                  .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                  .map((p) =>
+                    editandoId === p.id ? (
+                      <div
+                        key={p.id}
+                        className="border-2 border-black rounded-xl p-3 space-y-2"
+                      >
+                        <div>
+                          <label className="text-xs text-gray-500">Nombre</label>
+                          <input
+                            type="text"
+                            value={formEdicion.nombre}
+                            onChange={(e) =>
+                              setFormEdicion((f) => ({
+                                ...f,
+                                nombre: e.target.value,
+                              }))
+                            }
+                            className="w-full rounded border p-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500">
+                            Categoría
+                          </label>
+                          <input
+                            type="text"
+                            value={formEdicion.categoria}
+                            onChange={(e) =>
+                              setFormEdicion((f) => ({
+                                ...f,
+                                categoria: e.target.value,
+                              }))
+                            }
+                            className="w-full rounded border p-2 text-sm"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <label className="text-xs text-gray-500">
+                              Precio (S/)
+                              {p.unidad === "kg" ? " por kg" : ""}
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={formEdicion.precio}
+                              onChange={(e) =>
+                                setFormEdicion((f) => ({
+                                  ...f,
+                                  precio: e.target.value,
+                                }))
+                              }
+                              className="w-full rounded border p-2 text-sm"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="text-xs text-gray-500">
+                              Stock{p.unidad === "kg" ? " (kg)" : ""}
+                            </label>
+                            <input
+                              type="number"
+                              step={p.unidad === "kg" ? "0.001" : "1"}
+                              min="0"
+                              value={formEdicion.stock}
+                              onChange={(e) =>
+                                setFormEdicion((f) => ({
+                                  ...f,
+                                  stock: e.target.value,
+                                }))
+                              }
+                              className="w-full rounded border p-2 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={() => guardarEdicion(p.id, p.unidad)}
+                            className="flex-1 rounded bg-black text-white py-2 text-sm font-medium"
+                          >
+                            Guardar
+                          </button>
+                          <button
+                            onClick={cancelarEdicion}
+                            className="flex-1 rounded border py-2 text-sm"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between border rounded p-3"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <button
+                            onClick={() => handleToggleFavorito(p)}
+                            className="text-xl leading-none shrink-0"
+                            aria-label={
+                              p.favorito
+                                ? "Quitar de favoritos"
+                                : "Marcar como favorito"
+                            }
+                          >
+                            {p.favorito ? (
+                              <span className="text-yellow-500">★</span>
+                            ) : (
+                              <span className="text-gray-300">☆</span>
+                            )}
+                          </button>
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{p.nombre}</p>
+                            <p className="text-sm text-gray-500">
+                              S/ {p.precio.toFixed(2)}
+                              {p.unidad === "kg" ? " /kg" : ""} · Stock:{" "}
+                              {p.unidad === "kg" ? p.stock.toFixed(3) : p.stock}
+                              {p.unidad === "kg" ? " kg" : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => iniciarEdicion(p)}
+                            className="rounded border px-3 py-1.5 text-sm font-medium"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleEliminar(p.id)}
+                            className="rounded border border-red-300 text-red-600 px-3 py-1.5 text-sm font-medium"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    )
                   )}
-                </button>
-                <div>
-                  <p className="font-medium">{p.nombre}</p>
-                  <p className="text-sm text-gray-500">
-                    {p.categoria || "Sin categoría"} · S/ {p.precio.toFixed(2)}
-                    {p.unidad === "kg" ? " /kg" : ""}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {p.unidad === "unidad" ? (
-                  <>
-                    <button
-                      onClick={() => handleEditarStockUnidad(p.id, p.stock - 1)}
-                      className="rounded border w-8 h-8"
-                    >
-                      −
-                    </button>
-                    <span className="w-10 text-center">{p.stock}</span>
-                    <button
-                      onClick={() => handleEditarStockUnidad(p.id, p.stock + 1)}
-                      className="rounded border w-8 h-8"
-                    >
-                      +
-                    </button>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      defaultValue={p.stock}
-                      onBlur={(e) => handleEditarStockKg(p.id, e.target.value)}
-                      className="w-20 rounded border p-1 text-right"
-                    />
-                    <span className="text-sm text-gray-500">kg</span>
-                  </div>
-                )}
-                <button
-                  onClick={() => handleEliminar(p.id)}
-                  className="text-red-600 text-sm ml-2"
-                >
-                  Eliminar
-                </button>
               </div>
             </div>
           ))}
