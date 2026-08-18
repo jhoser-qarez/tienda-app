@@ -10,6 +10,7 @@ type Producto = {
   precio: number;
   stock: number;
   activo: boolean;
+  unidad: "unidad" | "kg";
 };
 
 export default function ProductosPage() {
@@ -17,11 +18,11 @@ export default function ProductosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Campos del formulario para agregar producto
   const [nombre, setNombre] = useState("");
   const [categoria, setCategoria] = useState("");
   const [precio, setPrecio] = useState("");
   const [stock, setStock] = useState("");
+  const [unidad, setUnidad] = useState<"unidad" | "kg">("unidad");
 
   const supabase = createClient();
 
@@ -41,9 +42,9 @@ export default function ProductosPage() {
   };
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- patrón válido de "cargar datos al montar"; ver https://github.com/facebook/react/issues/34743
-  cargarProductos();
-}, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- patrón válido de "cargar datos al montar"
+    cargarProductos();
+  }, []);
 
   const handleAgregar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +54,8 @@ export default function ProductosPage() {
       nombre,
       categoria: categoria || null,
       precio: parseFloat(precio),
-      stock: parseInt(stock),
+      stock: parseFloat(stock),
+      unidad,
     });
 
     if (error) {
@@ -61,16 +63,16 @@ export default function ProductosPage() {
       return;
     }
 
-    // Limpiar formulario y recargar lista
     setNombre("");
     setCategoria("");
     setPrecio("");
     setStock("");
+    setUnidad("unidad");
     setLoading(true);
     cargarProductos();
   };
 
-  const handleEditarStock = async (id: string, nuevoStock: number) => {
+  const handleEditarStockUnidad = async (id: string, nuevoStock: number) => {
     if (nuevoStock < 0) return;
 
     const { error } = await supabase
@@ -86,10 +88,25 @@ export default function ProductosPage() {
     cargarProductos();
   };
 
+  const handleEditarStockKg = async (id: string, valorTexto: string) => {
+    const nuevoStock = parseFloat(valorTexto);
+    if (isNaN(nuevoStock) || nuevoStock < 0) return;
+
+    const { error } = await supabase
+      .from("productos")
+      .update({ stock: nuevoStock })
+      .eq("id", id);
+
+    if (error) {
+      setError("Error al actualizar stock: " + error.message);
+      return;
+    }
+    cargarProductos();
+  };
+
   const handleEliminar = async (id: string) => {
     if (!confirm("¿Seguro que quieres eliminar este producto?")) return;
 
-    // No borramos de verdad, solo lo marcamos inactivo (para no perder historial de ventas)
     const { error } = await supabase
       .from("productos")
       .update({ activo: false })
@@ -107,7 +124,6 @@ export default function ProductosPage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-4">Inventario</h1>
 
-      {/* Formulario para agregar producto */}
       <form onSubmit={handleAgregar} className="space-y-2 border rounded p-4 mb-6">
         <h2 className="font-semibold">Agregar producto</h2>
         <input
@@ -125,12 +141,37 @@ export default function ProductosPage() {
           onChange={(e) => setCategoria(e.target.value)}
           className="w-full rounded border p-2"
         />
+
+        <div>
+          <p className="text-sm text-gray-600 mb-1">¿Cómo se vende?</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setUnidad("unidad")}
+              className={`flex-1 rounded border p-2 ${
+                unidad === "unidad" ? "bg-black text-white" : ""
+              }`}
+            >
+              Por unidad
+            </button>
+            <button
+              type="button"
+              onClick={() => setUnidad("kg")}
+              className={`flex-1 rounded border p-2 ${
+                unidad === "kg" ? "bg-black text-white" : ""
+              }`}
+            >
+              Por kilo
+            </button>
+          </div>
+        </div>
+
         <div className="flex gap-2">
           <input
             type="number"
             step="0.01"
             min="0"
-            placeholder="Precio (S/)"
+            placeholder={unidad === "kg" ? "Precio por kilo (S/)" : "Precio (S/)"}
             value={precio}
             onChange={(e) => setPrecio(e.target.value)}
             className="w-full rounded border p-2"
@@ -138,8 +179,9 @@ export default function ProductosPage() {
           />
           <input
             type="number"
+            step={unidad === "kg" ? "0.001" : "1"}
             min="0"
-            placeholder="Stock inicial"
+            placeholder={unidad === "kg" ? "Stock inicial (kg)" : "Stock inicial"}
             value={stock}
             onChange={(e) => setStock(e.target.value)}
             className="w-full rounded border p-2"
@@ -153,7 +195,6 @@ export default function ProductosPage() {
 
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
-      {/* Lista de productos */}
       {loading ? (
         <p>Cargando...</p>
       ) : productos.length === 0 ? (
@@ -169,22 +210,39 @@ export default function ProductosPage() {
                 <p className="font-medium">{p.nombre}</p>
                 <p className="text-sm text-gray-500">
                   {p.categoria || "Sin categoría"} · S/ {p.precio.toFixed(2)}
+                  {p.unidad === "kg" ? " /kg" : ""}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleEditarStock(p.id, p.stock - 1)}
-                  className="rounded border w-8 h-8"
-                >
-                  −
-                </button>
-                <span className="w-10 text-center">{p.stock}</span>
-                <button
-                  onClick={() => handleEditarStock(p.id, p.stock + 1)}
-                  className="rounded border w-8 h-8"
-                >
-                  +
-                </button>
+                {p.unidad === "unidad" ? (
+                  <>
+                    <button
+                      onClick={() => handleEditarStockUnidad(p.id, p.stock - 1)}
+                      className="rounded border w-8 h-8"
+                    >
+                      −
+                    </button>
+                    <span className="w-10 text-center">{p.stock}</span>
+                    <button
+                      onClick={() => handleEditarStockUnidad(p.id, p.stock + 1)}
+                      className="rounded border w-8 h-8"
+                    >
+                      +
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      defaultValue={p.stock}
+                      onBlur={(e) => handleEditarStockKg(p.id, e.target.value)}
+                      className="w-20 rounded border p-1 text-right"
+                    />
+                    <span className="text-sm text-gray-500">kg</span>
+                  </div>
+                )}
                 <button
                   onClick={() => handleEliminar(p.id)}
                   className="text-red-600 text-sm ml-2"

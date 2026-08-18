@@ -11,6 +11,7 @@ type Producto = {
   nombre: string;
   precio: number;
   stock: number;
+  unidad: "unidad" | "kg";
 };
 
 type Cliente = {
@@ -25,6 +26,14 @@ type ItemCarrito = {
 
 const METODOS = ["efectivo", "yape", "plin", "fiado"] as const;
 
+function extraerMensaje(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === "object" && "message" in err) {
+    return String((err as { message: unknown }).message);
+  }
+  return "Error desconocido";
+}
+
 function esErrorDeRed(err: unknown) {
   const msg = extraerMensaje(err).toLowerCase();
   return (
@@ -33,14 +42,6 @@ function esErrorDeRed(err: unknown) {
     msg.includes("internet_disconnected") ||
     msg.includes("err_")
   );
-}
-
-function extraerMensaje(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (err && typeof err === "object" && "message" in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return "Error desconocido";
 }
 
 export default function VentasPage() {
@@ -65,7 +66,7 @@ export default function VentasPage() {
       const [prodRes, cliRes] = await Promise.all([
         supabase
           .from("productos")
-          .select("id, nombre, precio, stock")
+          .select("id, nombre, precio, stock, unidad")
           .eq("activo", true)
           .gt("stock", 0)
           .order("nombre"),
@@ -108,6 +109,13 @@ export default function VentasPage() {
     setError("");
     setCarrito((prev) => {
       const existente = prev.find((i) => i.producto.id === producto.id);
+
+      if (producto.unidad === "kg") {
+        if (existente) return prev;
+        const cantidadInicial = Math.min(0.5, producto.stock);
+        return [...prev, { producto, cantidad: cantidadInicial }];
+      }
+
       if (existente) {
         if (existente.cantidad >= producto.stock) return prev;
         return prev.map((i) =>
@@ -120,7 +128,7 @@ export default function VentasPage() {
     });
   };
 
-  const cambiarCantidad = (productoId: string, delta: number) => {
+  const cambiarCantidadUnidad = (productoId: string, delta: number) => {
     setCarrito((prev) =>
       prev
         .map((i) =>
@@ -130,6 +138,22 @@ export default function VentasPage() {
         )
         .filter((i) => i.cantidad > 0)
     );
+  };
+
+  const cambiarCantidadKg = (productoId: string, valorTexto: string) => {
+    const valor = parseFloat(valorTexto);
+    setCarrito((prev) =>
+      prev.map((i) => {
+        if (i.producto.id !== productoId) return i;
+        if (isNaN(valor)) return i;
+        const clamped = Math.max(0, Math.min(valor, i.producto.stock));
+        return { ...i, cantidad: clamped };
+      })
+    );
+  };
+
+  const quitarDelCarrito = (productoId: string) => {
+    setCarrito((prev) => prev.filter((i) => i.producto.id !== productoId));
   };
 
   const total = carrito.reduce(
@@ -143,6 +167,11 @@ export default function VentasPage() {
 
     if (carrito.length === 0) {
       setError("Agrega al menos un producto");
+      return;
+    }
+
+    if (carrito.some((i) => i.cantidad <= 0)) {
+      setError("Hay un producto con cantidad en 0, quítalo o corrige la cantidad");
       return;
     }
 
@@ -179,27 +208,27 @@ export default function VentasPage() {
 
     let userId: string | null = null;
 
-try {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  userId = user?.id ?? null;
-} catch {
-  // Sin red no se puede validar contra el servidor: usar la sesión local
-}
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      userId = user?.id ?? null;
+    } catch {
+      // Sin red no se puede validar contra el servidor: usar la sesión local
+    }
 
-if (!userId) {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  userId = session?.user?.id ?? null;
-}
+    if (!userId) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      userId = session?.user?.id ?? null;
+    }
 
-if (!userId) {
-  setError("No se pudo identificar tu sesión. Vuelve a iniciar sesión.");
-  setGuardando(false);
-  return;
-}
+    if (!userId) {
+      setError("No se pudo identificar tu sesión. Vuelve a iniciar sesión.");
+      setGuardando(false);
+      return;
+    }
 
     try {
       const { error: rpcError } = await supabase.rpc("registrar_venta", {
@@ -297,7 +326,10 @@ if (!userId) {
           >
             <p className="font-medium">{p.nombre}</p>
             <p className="text-sm text-gray-500">
-              S/ {p.precio.toFixed(2)} · Stock: {p.stock}
+              S/ {p.precio.toFixed(2)}
+              {p.unidad === "kg" ? " /kg" : ""} · Stock:{" "}
+              {p.unidad === "kg" ? p.stock.toFixed(3) : p.stock}
+              {p.unidad === "kg" ? " kg" : ""}
             </p>
           </button>
         ))}
@@ -316,19 +348,44 @@ if (!userId) {
               >
                 <span>{i.producto.nombre}</span>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => cambiarCantidad(i.producto.id, -1)}
-                    className="rounded border w-8 h-8"
-                  >
-                    −
-                  </button>
-                  <span className="w-8 text-center">{i.cantidad}</span>
-                  <button
-                    onClick={() => cambiarCantidad(i.producto.id, 1)}
-                    className="rounded border w-8 h-8"
-                  >
-                    +
-                  </button>
+                  {i.producto.unidad === "unidad" ? (
+                    <>
+                      <button
+                        onClick={() => cambiarCantidadUnidad(i.producto.id, -1)}
+                        className="rounded border w-8 h-8"
+                      >
+                        −
+                      </button>
+                      <span className="w-8 text-center">{i.cantidad}</span>
+                      <button
+                        onClick={() => cambiarCantidadUnidad(i.producto.id, 1)}
+                        className="rounded border w-8 h-8"
+                      >
+                        +
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        max={i.producto.stock}
+                        value={i.cantidad}
+                        onChange={(e) =>
+                          cambiarCantidadKg(i.producto.id, e.target.value)
+                        }
+                        className="w-20 rounded border p-1 text-right"
+                      />
+                      <span className="text-sm text-gray-500">kg</span>
+                      <button
+                        onClick={() => quitarDelCarrito(i.producto.id)}
+                        className="text-red-600 text-sm"
+                      >
+                        Quitar
+                      </button>
+                    </>
+                  )}
                   <span className="w-20 text-right">
                     S/ {(i.producto.precio * i.cantidad).toFixed(2)}
                   </span>
